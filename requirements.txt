@@ -1,0 +1,2 @@
+-r finetune/requirements.txt
+-r baseline/requirements.txt
