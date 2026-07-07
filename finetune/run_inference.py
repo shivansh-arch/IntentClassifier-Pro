@@ -1,43 +1,51 @@
 """
 finetune/run_inference.py
-
-Owner: Shivansh (Part 1)
-
-Loads the trained LoRA adapter, runs inference on data/test.csv,
-and writes finetune/predictions.csv in the shared schema format.
-
-Run with: python finetune/run_inference.py
 """
 
 import time
+import torch
 import pandas as pd
-from shared.config import TEST_SPLIT, FINETUNE_PREDICTIONS, FINETUNE_ADAPTER_WEIGHTS
-from shared.schema import PREDICTION_COLUMNS, MODEL_NAMES
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from peft import PeftModel
 
+from shared.config import TEST_SPLIT, FINETUNE_PREDICTIONS, FINETUNE_ADAPTER_WEIGHTS
+from shared.schema import INTENT_LABELS, PREDICTION_COLUMNS, MODEL_NAMES
+
+tokenizer = AutoTokenizer.from_pretrained("distilbert-base-uncased")
+base_model = AutoModelForSequenceClassification.from_pretrained(
+    "distilbert-base-uncased", num_labels=len(INTENT_LABELS)
+)
+model = PeftModel.from_pretrained(base_model, FINETUNE_ADAPTER_WEIGHTS)
+model.eval()
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model.to(device)
 
 
 def predict_batch(test_df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Must return a DataFrame with exactly PREDICTION_COLUMNS.
-    Measure latency_ms per single example (batch size 1) to keep the
-    comparison against the baseline fair.
-    """
     rows = []
-    for _, row in test_df.iterrows():
-        start = time.perf_counter()
-        # TODO: tokenize row["text"], run through model, softmax -> predicted label + confidence
-        predicted_label = None  # placeholder
-        confidence = None       # placeholder
-        latency_ms = (time.perf_counter() - start) * 1000
+    with torch.no_grad():
+        for _, row in test_df.iterrows():
+            start = time.perf_counter()
+            encoding = tokenizer(
+                row["text"], truncation=True, padding="max_length",
+                max_length=64, return_tensors="pt"
+            ).to(device)
 
-        rows.append({
-            "text": row["text"],
-            "true_label": row["label"],
-            "predicted_label": predicted_label,
-            "confidence": confidence,
-            "latency_ms": latency_ms,
-            "model_name": MODEL_NAMES["finetuned"],
-        })
+            outputs = model(**encoding)
+            probs = torch.softmax(outputs.logits, dim=-1)
+            confidence, pred_idx = torch.max(probs, dim=-1)
+
+            latency_ms = (time.perf_counter() - start) * 1000
+
+            rows.append({
+                "text": row["text"],
+                "true_label": row["label"],
+                "predicted_label": INTENT_LABELS[pred_idx.item()],
+                "confidence": confidence.item(),
+                "latency_ms": latency_ms,
+                "model_name": MODEL_NAMES["finetuned"],
+            })
     return pd.DataFrame(rows, columns=PREDICTION_COLUMNS)
 
 
@@ -46,3 +54,4 @@ if __name__ == "__main__":
     predictions = predict_batch(test_df)
     predictions.to_csv(FINETUNE_PREDICTIONS, index=False)
     print(f"Saved {len(predictions)} predictions to {FINETUNE_PREDICTIONS}")
+    print(f"Overall accuracy: {(predictions['true_label'] == predictions['predicted_label']).mean():.4f}")

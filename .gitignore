@@ -19,3 +19,4 @@ finetune/lora_adapter/*.safetensors
 
 # Notebooks checkpoints
 .ipynb_checkpoints/
+"*.log" 
