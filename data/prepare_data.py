@@ -16,7 +16,7 @@ import pandas as pd
 from shared.config import TRAIN_SPLIT, VAL_SPLIT, TEST_SPLIT
 
 if __name__ == "__main__":
-    ds = load_dataset("PolyAI/banking77")
+    ds = load_dataset("PolyAI/banking77", trust_remote_code=True)
 
     train_full = ds["train"].to_pandas()
     test = ds["test"].to_pandas()
