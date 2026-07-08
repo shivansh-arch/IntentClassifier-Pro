@@ -68,10 +68,7 @@ class IntentDataset(Dataset):
         }
 
 
-# TODO: wrap IntentDataset(TRAIN_SPLIT, ...) and IntentDataset(VAL_SPLIT, ...) in DataLoaders
-# TODO: manual training loop — forward pass, CrossEntropyLoss, backward, optimizer.step(), per epoch
-# TODO: per-epoch validation loop (no gradient updates, just measure val loss/accuracy)
-# TODO: model.save_pretrained(FINETUNE_ADAPTER_WEIGHTS)
+
 if __name__ == "__main__":
     train_dataset = IntentDataset(TRAIN_SPLIT, tokenizer)
     val_dataset = IntentDataset(VAL_SPLIT, tokenizer)
