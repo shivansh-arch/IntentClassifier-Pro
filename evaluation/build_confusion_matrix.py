@@ -15,14 +15,24 @@ without waiting idle. Swap to real files the moment they exist.
 Run with: python evaluation/build_confusion_matrix.py
 """
 
+
+import matplotlib.pyplot as plt
+import seaborn as sns
 import numpy as np
 import pandas as pd
 from sklearn.metrics import accuracy_score, confusion_matrix
 
+
+
 from shared.config import (
+
     FINETUNE_PREDICTIONS, BASELINE_PREDICTIONS, TEST_SPLIT,
-    TOP_CONFUSIONS_CSV, METRICS_SUMMARY_JSON,
+
+    TOP_CONFUSIONS_CSV, METRICS_SUMMARY_JSON, CONFUSION_MATRIX_PNG,
+
 )
+
+
 from shared.schema import INTENT_LABELS, MODEL_NAMES
 
 
@@ -54,6 +64,49 @@ def top_confused_pairs(true_labels, pred_labels, labels, top_n=10):
     return pd.DataFrame(pairs)
 
 
+
+def plot_confusion_matrix(true_labels, pred_labels, labels, save_path, top_n_labels=20):
+
+    """
+
+    Full 77x77 confusion matrix is unreadable. Plot only the top_n_labels
+
+    most frequent intents in the test set, so the image is actually legible.
+
+    """
+
+    from collections import Counter
+
+    most_common = [label for label, _ in Counter(true_labels).most_common(top_n_labels)]
+
+    cm = confusion_matrix(true_labels, pred_labels, labels=most_common)
+
+    plt.figure(figsize=(14, 12))
+
+    sns.heatmap(cm, annot=True, fmt="d", cmap="Blues",
+
+                xticklabels=most_common, yticklabels=most_common)
+
+    plt.xlabel("Predicted Label")
+
+    plt.ylabel("True Label")
+
+    plt.title(f"Confusion Matrix — Top {top_n_labels} Most Frequent Intents (Fine-tuned Model)")
+
+    plt.xticks(rotation=90)
+
+    plt.yticks(rotation=0)
+
+    plt.tight_layout()
+
+    plt.savefig(save_path, dpi=150)
+
+    plt.close()
+
+    print(f"Saved confusion matrix plot to {save_path}")
+
+
+
 if __name__ == "__main__":
     ft = load_or_dummy(FINETUNE_PREDICTIONS, MODEL_NAMES["finetuned"])
     bl = load_or_dummy(BASELINE_PREDICTIONS, MODEL_NAMES["baseline"])
@@ -68,6 +121,8 @@ if __name__ == "__main__":
 
     confusions = top_confused_pairs(ft["true_label"], ft["predicted_label"], INTENT_LABELS)
     confusions.to_csv(TOP_CONFUSIONS_CSV, index=False)
+
+    plot_confusion_matrix(ft["true_label"], ft["predicted_label"], INTENT_LABELS, CONFUSION_MATRIX_PNG)
 
     import json
     with open(METRICS_SUMMARY_JSON, "w") as f:
