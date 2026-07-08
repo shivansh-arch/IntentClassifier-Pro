@@ -1,0 +1,6 @@
+{
+  "finetuned_accuracy": 0.8902597402597403,
+  "baseline_accuracy": 0.8746753246753247,
+  "finetuned_avg_latency_ms": 23.608205258141744,
+  "baseline_avg_latency_ms": 76.30191870130325
+}
