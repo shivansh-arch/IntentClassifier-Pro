@@ -24,10 +24,22 @@ from shared.config import TEST_SPLIT, BASELINE_PREDICTIONS
 from shared.schema import INTENT_LABELS, PREDICTION_COLUMNS, MODEL_NAMES
 
 load_dotenv()
-client = OpenAI(
-    api_key=os.getenv("CEREBRAS_API_KEY"),
-    base_url="https://api.cerebras.ai/v1",
-)
+
+client = None
+
+def get_client(api_key=None):
+    global client
+    if client is not None:
+        return client
+    key = api_key or os.getenv("CEREBRAS_API_KEY")
+    if not key:
+        raise ValueError("CEREBRAS_API_KEY must be set in environment or passed directly.")
+    client = OpenAI(
+        api_key=key,
+        base_url="https://api.cerebras.ai/v1",
+    )
+    return client
+
 
 MODEL_NAME = "gpt-oss-120b"
 BATCH_SIZE = 15
@@ -74,13 +86,19 @@ def parse_batch_response(raw_text: str, expected_count: int) -> list[str]:
     return labels[:expected_count]
 
 
-def classify_batch(batch_texts: list[str], max_retries: int = MAX_RETRIES) -> tuple[list[str], float]:
+def classify_batch(batch_texts: list[str], max_retries: int = MAX_RETRIES, api_key: str = None) -> tuple[list[str], float]:
     prompt = build_batch_prompt(batch_texts)
     start = time.perf_counter()
 
+    try:
+        api_client = get_client(api_key)
+    except ValueError as e:
+        print(f"Error initializing OpenAI client: {e}")
+        return ["CLIENT_INIT_FAILED"] * len(batch_texts), 0.0
+
     for attempt in range(max_retries):
         try:
-            response = client.chat.completions.create(
+            response = api_client.chat.completions.create(
                 model=MODEL_NAME,
                 messages=[{"role": "user", "content": prompt}],
             )
