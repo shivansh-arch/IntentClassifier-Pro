@@ -1,63 +1,126 @@
 # IntentClassifier Pro — Tuned vs Prompted
 
-Compares a LoRA-fine-tuned DistilBERT against a prompting baseline for intent
-classification on BANKING77.
+An interactive banking intent classification system that compares a **fine-tuned DistilBERT (via LoRA)** against a **few-shot prompted LLM baseline (gpt-oss-120b)** on the **BANKING77** dataset.
 
-## Team & Ownership
+The project demonstrates that a compact model fine-tuned on task-specific data can achieve higher accuracy with significantly lower inference latency compared to prompting a much larger general-purpose LLM.
 
-| Part | Owner | Folder |
-|---|---|---|
-| 1 — Fine-tuning | Shivansh | `finetune/` |
-| 2 — Baseline + App | Teammate 2 | `baseline/`, `app/` |
-| 3 — Analysis + Report | Teammate 3 | reads `evaluation/` outputs |
+---
 
-## Setup (everyone runs this first)
+## 📊 Evaluation Results
+
+Here is the comparison between the two classification approaches computed on the full BANKING77 test set:
+
+| Model / Approach | Accuracy | Avg Latency / Sentence | Details |
+| :--- | :---: | :---: | :--- |
+| **Fine-tuned DistilBERT (LoRA)** | **89.03%** | **23.61 ms** | DistilBERT base fine-tuned with Low-Rank Adaptation (LoRA) |
+| **Prompted LLM Baseline** | **87.47%** | **76.30 ms** | `gpt-oss-120b` via Cerebras API with few-shot prompting |
+
+*Note: The fine-tuned LoRA model delivers a **+1.56% accuracy improvement** while running **3.2x faster** on average.*
+
+---
+
+## 🏗️ System Architecture
+
+The workflow consists of data preparation, parallel inference runs, evaluation matrix compilation, and an interactive frontend dashboard:
+
+```mermaid
+graph TD
+    A[PolyAI/banking77 Dataset] --> B[data/prepare_data.py]
+    B -->|train.csv & val.csv| C[finetune/train_lora.py]
+    B -->|test.csv| D[finetune/run_inference.py]
+    B -->|test.csv| E[baseline/call_llm_baseline.py]
+    C -->|lora_adapter/| D
+    D -->|predictions.csv| F[evaluation/build_confusion_matrix.py]
+    E -->|predictions.csv| F
+    F -->|metrics & confusion matrix| G[app/streamlit_app.py]
+```
+
+---
+
+## 📂 Project Structure
+
+```
+IntentClassifier-Pro/
+├── shared/              # Central config and schema definitions
+│   ├── config.py        # Centralized file paths across directories
+│   └── schema.py        # Single source of truth for intent labels and columns
+├── data/                # Data download and split scripts
+│   ├── prepare_data.py  # PolyAI banking77 downloader & stratifier
+│   └── *.csv            # Stratified train, val, and test splits (generated)
+├── finetune/            # Fine-tuning and local inference pipeline
+│   ├── train_lora.py    # PEFT training script on DistilBERT base
+│   ├── run_inference.py # LoRA model test set predictor
+│   └── lora_adapter/    # Saved adapter weights and configurations
+├── baseline/            # LLM baseline pipeline
+│   └── call_llm_baseline.py # Batch prompter for gpt-oss-120b
+├── evaluation/          # Metrics and error analysis
+│   ├── build_confusion_matrix.py # Comparator, accuracy metrics & matrix plotter
+│   ├── confusion_matrix.png      # Legible heatmap of top confused intents
+│   └── metrics_summary.json      # Offline comparison metrics
+└── app/                 # Live web interface
+    └── streamlit_app.py # Interactive demo and evaluation dashboard
+```
+
+---
+
+## ⚙️ Setup & Installation
+
+Clone the repository and install the dependencies:
 
 ```bash
-git clone <repo-url>
-cd intentclassifier-pro
+# Clone the repository
+git clone https://github.com/shivansh-arch/IntentClassifier-Pro.git
+cd IntentClassifier-Pro
+
+# Create and activate virtual environment
 python -m venv venv
-source venv/bin/activate        # Windows: venv\Scripts\activate
+source venv/bin/activate  # On Windows use: venv\Scripts\activate
+
+# Install requirements
 pip install -r requirements.txt
-cp .env.example .env            # then fill in your own API key locally
 ```
 
-## Day 1 — before anyone writes real code
-
-1. Run `python data/prepare_data.py` once (whoever gets to it first).
-2. Copy the printed label list into `shared/schema.py` → `INTENT_LABELS`. Do this exactly once — every other file imports from there.
-3. Confirm everyone can import `shared.config` and `shared.schema` without errors.
-
-## Folder structure
-
-```
-intentclassifier-pro/
-├── shared/              # schema.py + config.py — the contract everyone imports, edited rarely
-├── data/                # prepare_data.py + generated train/val/test CSVs
-├── finetune/            # Part 1 — LoRA training + inference
-├── baseline/            # Part 2 — prompting baseline
-├── evaluation/          # Part 3 reads outputs here — confusion matrix, metrics
-├── app/                 # Streamlit demo (Part 2)
-├── requirements.txt     # combined, used for deployment
-└── .env.example         # documents required secrets without exposing real ones
-```
-
-## Running each part
-
+### Configure API Keys
+Copy `.env.example` to `.env` and fill in your Cerebras API key to run the prompting baseline:
 ```bash
-python data/prepare_data.py                 # once, Day 1
-python finetune/train_lora.py                 # Part 1
-python finetune/run_inference.py              # Part 1 -> finetune/predictions.csv
-python baseline/call_llm_baseline.py          # Part 2 -> baseline/predictions.csv
-python evaluation/build_confusion_matrix.py   # Part 3 input -> evaluation/*.csv, *.json
-streamlit run app/streamlit_app.py            # Part 2 -> live demo
+cp .env.example .env
 ```
 
-## Rules that keep this from breaking
+---
 
-- Never hand-type a label name or CSV column — import from `shared/schema.py`.
-- Never hardcode a file path — import from `shared/config.py`.
-- Never commit `.env` or real API keys — use `.env.example` as the template, Streamlit Cloud Secrets when deployed.
-- `evaluation/build_confusion_matrix.py` auto-generates dummy predictions if the real CSVs don't exist yet, so Part 3 is never blocked waiting on Parts 1/2.
+## 🚀 Running the Pipeline
 
-See `IntentClassifier_Pro_Pipeline_Deep_Dive.md` for the in-depth explanation of what each stage is actually doing.
+Follow these steps to run each part of the project:
+
+1. **Prepare Data** (Stratifies splits & copies labels):
+   ```bash
+   python data/prepare_data.py
+   ```
+2. **Train LoRA Model**:
+   ```bash
+   python finetune/train_lora.py
+   ```
+3. **Run LoRA Test-Set Inference**:
+   ```bash
+   python finetune/run_inference.py
+   ```
+4. **Run LLM Baseline Test-Set Inference**:
+   ```bash
+   python -m baseline.call_llm_baseline
+   ```
+5. **Compile Metrics & Confusion Matrix**:
+   ```bash
+   python evaluation/build_confusion_matrix.py
+   ```
+6. **Launch Streamlit Web App**:
+   ```bash
+   streamlit run app/streamlit_app.py
+   ```
+
+---
+
+## 💻 Web App Live Demo
+
+The Streamlit web application includes:
+* **Interactive Live Demo**: Input custom messages (e.g., *"I lost my wallet, can you block my card?"*) to see classifications from both the fine-tuned and prompting models side-by-side with latency metrics.
+* **Results Dashboard**: Displays summary metric comparison cards, the legibly rendered 20x20 confusion matrix, and a data table of the top 10 most common classification mistakes.
