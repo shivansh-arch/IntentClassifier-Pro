@@ -8,9 +8,7 @@ __pycache__/
 .venv/
 venv/
 
-# Model weights (large — use Hugging Face Hub or Git LFS instead, unless tiny)
-finetune/lora_adapter/*.bin
-finetune/lora_adapter/*.safetensors
+
 
 # OS/editor junk
 .DS_Store
