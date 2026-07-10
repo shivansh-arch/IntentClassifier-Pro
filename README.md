@@ -1,13 +1,4 @@
----
-title: IntentClassifier Pro
-emoji: 🤖
-colorFrom: blue
-colorTo: indigo
-sdk: streamlit
-sdk_version: "1.38.0"
-app_file: app/streamlit_app.py
-pinned: false
----
+
  # IntentClassifier Pro — Tuned vs Prompted
 
 An interactive banking intent classification system that compares a **fine-tuned DistilBERT (via LoRA)** against a **few-shot prompted LLM baseline (gpt-oss-120b)** on the **BANKING77** dataset.
