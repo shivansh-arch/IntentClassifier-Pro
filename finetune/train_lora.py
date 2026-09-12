@@ -14,6 +14,7 @@ Run with: python -m finetune.train_lora
 
 import pandas as pd
 import torch
+from tqdm import tqdm
 from torch.utils.data import Dataset, DataLoader
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from peft import LoraConfig, get_peft_model, TaskType
@@ -36,6 +37,7 @@ lora_config = LoraConfig(
     lora_alpha=16,
     lora_dropout=0.1,
     target_modules=["q_lin", "v_lin"],
+    modules_to_save=["pre_classifier", "classifier"],
 )
 model = get_peft_model(model, lora_config)
 model.print_trainable_parameters()
@@ -86,7 +88,7 @@ if __name__ == "__main__":
     for epoch in range(num_epochs):
         model.train()
         total_loss = 0
-        for batch in train_loader:
+        for batch in tqdm(train_loader, desc=f"Epoch {epoch+1}/{num_epochs}"):
             optimizer.zero_grad()
             input_ids = batch["input_ids"].to(device)
             attention_mask = batch["attention_mask"].to(device)
@@ -123,5 +125,11 @@ if __name__ == "__main__":
         val_accuracy = correct / total
         print(f"          val_loss={avg_val_loss:.4f}, val_accuracy={val_accuracy:.4f}")
 
-    model.save_pretrained(FINETUNE_ADAPTER_WEIGHTS)
-    print(f"Saved adapter to {FINETUNE_ADAPTER_WEIGHTS}")
+    adapter_path = str(FINETUNE_ADAPTER_WEIGHTS.resolve())
+
+    model.save_pretrained(
+        adapter_path,
+        safe_serialization=True
+    )
+
+    print(f"Saved adapter to {adapter_path}")
