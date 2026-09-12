@@ -15,7 +15,7 @@ tokenizer = AutoTokenizer.from_pretrained("distilbert-base-uncased")
 base_model = AutoModelForSequenceClassification.from_pretrained(
     "distilbert-base-uncased", num_labels=len(INTENT_LABELS)
 )
-model = PeftModel.from_pretrained(base_model, FINETUNE_ADAPTER_WEIGHTS)
+model = PeftModel.from_pretrained(base_model, str(FINETUNE_ADAPTER_WEIGHTS))
 model.eval()
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
